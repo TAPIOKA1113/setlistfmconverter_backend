@@ -80,9 +80,9 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
   }
 }
 
-app.get('/scrape', async (c) => {
-  // const url = c.req.query('url')
-  const url = 'https://www.livefans.jp/events/1100704'
+app.get('/scrape/:id', async (c) => {
+  const id = c.req.param('id')
+  const url = `https://www.livefans.jp/events/${id}`
 
   if (!url) {
     return c.json({ error: 'URL parameter is required' }, 400)
