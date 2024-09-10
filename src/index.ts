@@ -35,39 +35,58 @@ interface SortedElement {
   content: string
 }
 
-async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> {
-  const browser = await puppeteer.launch( { headless: false })
+async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> { // 高さを取得する必要のあるセットリスト
+  const browser = await puppeteer.launch({ headless: false })
   const page = await browser.newPage()
 
   try {
     await page.goto(url, { waitUntil: 'networkidle0' })
-  
+
     // Get all td elements
-    const tdElements = await page.$$('td') 
-    console.log(tdElements)
+    const tdElements = await page.$$('td')
+
+    // tdElements[0]がpcsl1クラスを持っていたらtrue
+    const isPCSL1 = await tdElements[0].evaluate((element) => {
+      return element.classList.contains('pcsl1')
+    })
 
     const results: SortedElement[] = []
 
-    for (const td of tdElements) {
-      const topValue = await td.evaluate((element) => {
-        const computedStyle = window.getComputedStyle(element)
-        return computedStyle.getPropertyValue('top')
-      })
+    if (isPCSL1) {
 
-      const match = topValue.match(/(\d+)px/)
+      for (const td of tdElements) {
+        const topValue = await td.evaluate((element) => {
+          const computedStyle = window.getComputedStyle(element)
+          return computedStyle.getPropertyValue('top')
+        })
 
-      if (match) {
-        const number = parseInt(match[1], 10)
-        const aElement = await td.$('div > a')
-        if (aElement) {
-          const textContent = await aElement.evaluate(element => element.textContent) // 修正: evaluateを使用してtextContentを取得
-          if (textContent) {
-            results.push({ position: number, content: textContent.trim() })
+        const match = topValue.match(/(\d+)px/)
+
+        if (match) {
+          const number = parseInt(match[1], 10)
+          const aElement = await td.$('div > a')
+          if (aElement) {
+            const textContent = await aElement.evaluate(element => element.textContent)
+            if (textContent) {
+              results.push({ position: number, content: textContent.trim() })
+            }
+          }
+        } else {
+          console.log(`No number found: ${topValue}`)
+        }
+      }
+    } 
+    else 
+    {
+        for (const td of tdElements) {
+          const aElement = await td.$('div > a')
+          if (aElement) {
+            const textContent = await aElement.evaluate(element => element.textContent)
+            if (textContent) {
+              results.push({ position: 0, content: textContent.trim() })
+            }
           }
         }
-      } else {
-        console.log(`No number found: ${topValue}`)
-      }
     }
 
     // Sort results by position
