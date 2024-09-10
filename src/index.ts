@@ -2,9 +2,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
 import axios from 'axios'
-import * as cheerio from 'cheerio';
-import { chromium } from 'playwright'
 import puppeteer from 'puppeteer'
+import SpotifyWebApi from 'spotify-web-api-node'
 
 const app = new Hono()
 
@@ -31,9 +30,69 @@ interface Setlist {
 }
 
 interface SortedElement {
+  artistName: string
   position: number
   content: string
 }
+
+const username = 'gnti7y5zkih9elje0lzd4b84g';
+const clientId = '7ca33bfaf9ce41fbbc43a2abeec4e53d';
+const clientSecret = '79b0572f34084761b508cbca34bd3512';
+let accessToken = '';
+
+const spotifyApi = new SpotifyWebApi({
+  clientId: clientId,
+  clientSecret: clientSecret,
+  redirectUri: 'http://localhost:3000'
+});
+
+const authEncoded = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+const authHeaders = {
+  'Authorization': `Basic ${authEncoded}`,
+  'Content-Type':'application/x-www-form-urlencoded'
+};
+const authData = {
+  'grant_type': 'refresh_token',
+  'refresh_token': 'AQDbn04HT4tNMovNt2r3j_xiNOz2qJPXrsIszfJEH7MfEQCR2ZBGsk9vrBeYosvqfy92UM2ciFLONzwd3K8J63wklBh9NBGfIypgOg-wgRpjGiYuPYD6gc933gNR_TpnhNU'
+};
+
+async function submitSetlist(setlist: Setlist) {
+
+  try{
+    const authUrl = 'https://accounts.spotify.com/api/token';
+    const response = await axios.post(authUrl, authData, { headers: authHeaders });
+    accessToken = response.data.access_token;
+    spotifyApi.setAccessToken(accessToken);
+
+    const datePart = setlist.event_date.toISOString().split('T')[0];
+
+      const playlist = await spotifyApi.createPlaylist(username, {
+        name: `${setlist.artist_name} ${setlist.tour_name} (${datePart})`,
+        public: true
+      });
+
+      for (const song of setlist.songs) {
+        console.log(song);
+        const trackId = await spSearchSong(song.name, song.original_artist);
+        await spAddPlaylist(playlist.body.id, trackId);
+      }
+
+      console.log(`Playlist created: https://open.spotify.com/playlist/${playlist.body.id}`);
+  } catch (error) {
+    console.error('Error submitting setlist:', error);
+  }
+}
+
+async function spSearchSong(name: string, artist: string): Promise<string> {
+  const q = `${encodeURIComponent(name)} ${encodeURIComponent(artist)}`;
+  const data = await spotifyApi.searchTracks(q, { limit: 1, offset: 0, market: 'US' });
+  return data.body.tracks!.items[0].id;
+}
+
+async function spAddPlaylist(playlistId: string, trackId: string): Promise<void> {
+  await spotifyApi.addTracksToPlaylist(playlistId, [`spotify:track:${trackId}`]);
+}
+
 
 async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> { // 高さを取得する必要のあるセットリスト
   const browser = await puppeteer.launch({ headless: false })
@@ -46,10 +105,13 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
     const tdElements = await page.$$('td')
 
     // tdElements[0]がpcsl1クラスを持っていたらtrue
-    const isPCSL1 = await tdElements[0].evaluate((element) => {
+    const isPCSL1: boolean = await tdElements[0].evaluate((element) => {
       return element.classList.contains('pcsl1')
     })
 
+    const artistName = await page.$('h4 > a')
+    const artistNameText = await artistName?.evaluate(element => element.textContent) || "";
+    
     const results: SortedElement[] = []
 
     if (isPCSL1) {
@@ -68,38 +130,42 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
           if (aElement) {
             const textContent = await aElement.evaluate(element => element.textContent)
             if (textContent) {
-              results.push({ position: number, content: textContent.trim() })
+              results.push({ artistName: artistNameText, position: number, content: textContent.trim() })
             }
           }
         } else {
           console.log(`No number found: ${topValue}`)
         }
       }
-    } 
-    else 
-    {
-        for (const td of tdElements) {
-          const aElement = await td.$('div > a')
-          if (aElement) {
-            const textContent = await aElement.evaluate(element => element.textContent)
-            if (textContent) {
-              results.push({ position: 0, content: textContent.trim() })
-            }
+    }
+    else {
+      for (const td of tdElements) {
+        const aElement = await td.$('div > a')
+        if (aElement) {
+          const textContent = await aElement.evaluate(element => element.textContent)
+          if (textContent) {
+            results.push({ artistName: artistNameText, position: 0, content: textContent.trim() })
           }
         }
+      }
     }
 
-    // Sort results by position
+    // 1曲目から順に並び替え
     return results.sort((a, b) => a.position - b.position)
+
   } catch (error) {
+
     console.error(`An error occurred: ${error}`)
     return null
+
   } finally {
+
     await browser.close()
+
   }
 }
 
-app.get('/scrape/:id', async (c) => {
+app.get('/scrape/:id', async (c) => {  // LiveFansからセットリストを取得
   const id = c.req.param('id')
   const url = `https://www.livefans.jp/events/${id}`
 
@@ -119,7 +185,7 @@ app.get('/scrape/:id', async (c) => {
 
 
 
-app.get('/api/setlist/:id', async (c) => {
+app.get('/api/setlist/:id', async (c) => {  // Setlist.fmからセットリストを取得
   const id = c.req.param('id')
   const url = `https://api.setlist.fm/rest/1.0/setlist/${id}`
   const headers = {
@@ -178,7 +244,12 @@ app.get('/api/setlist/:id', async (c) => {
       songs: setlistSongs
     };
 
+    submitSetlist(setlist);
+
     return c.json(setlist);
+
+    
+
   } catch (error) {
     console.error('Error fetching setlist:', error)
     return c.json({ error: 'Failed to fetch setlist' }, 500)

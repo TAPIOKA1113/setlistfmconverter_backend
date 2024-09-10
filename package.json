@@ -10,7 +10,9 @@
     "cheerio": "^1.0.0",
     "hono": "^4.5.11",
     "playwright": "^1.47.0",
-    "puppeteer": "^23.3.0"
+    "puppeteer": "^23.3.0",
+    "spotify-oauth2": "^1.0.3",
+    "spotify-web-api-node": "^5.0.2"
   },
   "devDependencies": {
     "@types/node": "^20.11.17",
