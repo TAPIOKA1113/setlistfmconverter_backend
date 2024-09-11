@@ -4,6 +4,7 @@ import { serve } from '@hono/node-server'
 import axios from 'axios'
 import puppeteer from 'puppeteer'
 import SpotifyWebApi from 'spotify-web-api-node'
+import { create } from 'domain'
 
 const app = new Hono()
 
@@ -27,6 +28,7 @@ interface Setlist {
   venue: string;
   tour_name: string;
   songs: Song[];
+  setlist_id?: string;
 }
 
 interface SortedElement {
@@ -49,16 +51,16 @@ const spotifyApi = new SpotifyWebApi({
 const authEncoded = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 const authHeaders = {
   'Authorization': `Basic ${authEncoded}`,
-  'Content-Type':'application/x-www-form-urlencoded'
+  'Content-Type': 'application/x-www-form-urlencoded'
 };
 const authData = {
   'grant_type': 'refresh_token',
   'refresh_token': 'AQDbn04HT4tNMovNt2r3j_xiNOz2qJPXrsIszfJEH7MfEQCR2ZBGsk9vrBeYosvqfy92UM2ciFLONzwd3K8J63wklBh9NBGfIypgOg-wgRpjGiYuPYD6gc933gNR_TpnhNU'
 };
 
-async function submitSetlist(setlist: Setlist) {
+async function createSetlist(setlist: Setlist) {
 
-  try{
+  try {
     const authUrl = 'https://accounts.spotify.com/api/token';
     const response = await axios.post(authUrl, authData, { headers: authHeaders });
     accessToken = response.data.access_token;
@@ -66,18 +68,19 @@ async function submitSetlist(setlist: Setlist) {
 
     const datePart = setlist.event_date.toISOString().split('T')[0];
 
-      const playlist = await spotifyApi.createPlaylist(username, {
-        name: `${setlist.artist_name} ${setlist.tour_name} (${datePart})`,
-        public: true
-      });
+    const playlist = await spotifyApi.createPlaylist(username, {
+      name: `${setlist.artist_name} ${setlist.tour_name} (${datePart})`,
+      public: true
+    });
 
-      for (const song of setlist.songs) {
-        console.log(song);
-        const trackId = await spSearchSong(song.name, song.original_artist);
-        await spAddPlaylist(playlist.body.id, trackId);
-      }
+    for (const song of setlist.songs) {
+      const trackId = await spSearchSong(song.name, song.original_artist);
+      await spAddPlaylist(playlist.body.id, trackId);
+    }
 
-      console.log(`Playlist created: https://open.spotify.com/playlist/${playlist.body.id}`);
+    console.log(`Playlist created: https://open.spotify.com/playlist/${playlist.body.id}`);
+    return playlist.body.id;
+
   } catch (error) {
     console.error('Error submitting setlist:', error);
   }
@@ -94,7 +97,7 @@ async function spAddPlaylist(playlistId: string, trackId: string): Promise<void>
 }
 
 
-async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> { // 高さを取得する必要のあるセットリスト
+async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> {
   const browser = await puppeteer.launch({ headless: false })
   const page = await browser.newPage()
 
@@ -111,7 +114,7 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
 
     const artistName = await page.$('h4 > a')
     const artistNameText = await artistName?.evaluate(element => element.textContent) || "";
-    
+
     const results: SortedElement[] = []
 
     if (isPCSL1) {
@@ -175,6 +178,8 @@ app.get('/scrape/:id', async (c) => {  // LiveFansからセットリストを取
 
   const sortedElements = await getVisuallySortedElements(url)
 
+
+
   if (sortedElements) {
     console.log(sortedElements)
     return c.json(sortedElements)
@@ -235,20 +240,22 @@ app.get('/api/setlist/:id', async (c) => {  // Setlist.fmからセットリス�
       });
     });
 
+
+
     const setlist: Setlist = {
       artist_name: artistName,
       event_date: eventDate,
       location: city,
       venue: venue,
       tour_name: tourName,
-      songs: setlistSongs
+      songs: setlistSongs,
     };
+    
+    const setlist_id = await createSetlist(setlist);
 
-    submitSetlist(setlist);
+    setlist['setlist_id'] = setlist_id;
 
     return c.json(setlist);
-
-    
 
   } catch (error) {
     console.error('Error fetching setlist:', error)
