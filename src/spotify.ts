@@ -4,6 +4,7 @@ import { serve } from '@hono/node-server'
 import axios from 'axios'
 import SpotifyWebApi from 'spotify-web-api-node';
 import { decode } from 'punycode';
+import { USERNAME, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN } from '../env';
 
 interface Song {
     index: number;
@@ -26,9 +27,9 @@ interface Setlist {
 }
 
 
-const username = 'gnti7y5zkih9elje0lzd4b84g';
-const clientId = '7ca33bfaf9ce41fbbc43a2abeec4e53d';
-const clientSecret = '79b0572f34084761b508cbca34bd3512';
+const username = USERNAME;
+const clientId = CLIENT_ID;
+const clientSecret = CLIENT_SECRET;
 let accessToken = '';
 
 const spotifyApi = new SpotifyWebApi({
@@ -44,30 +45,8 @@ const authHeaders = {
 };
 const authData = {
     'grant_type': 'refresh_token',
-    'refresh_token': 'AQDbn04HT4tNMovNt2r3j_xiNOz2qJPXrsIszfJEH7MfEQCR2ZBGsk9vrBeYosvqfy92UM2ciFLONzwd3K8J63wklBh9NBGfIypgOg-wgRpjGiYuPYD6gc933gNR_TpnhNU'
-};
-
-var my_encodeURIComponent = (str: string) => str.replaceAll(/./g, (c) => {
-	if (/[A-Za-z0-9-_.!~*'()]/u.test(c)) {
-		return c;
-	}
-
-	var code_unit_value = c.charCodeAt(0);
-
-	if (code_unit_value <= 0x007F) {
-		return '%' + code_unit_value.toString(16).toUpperCase();
-	} else if (code_unit_value <= 0x07FF) {
-		return '%' + (((code_unit_value & 0x7c0) >> 6) | 0xc0).toString(16).toUpperCase()
-			+ '%' + ((code_unit_value & 0x3f) | 0x80).toString(16).toUpperCase();
-	} else if (code_unit_value <= 0xD7FF) {
-		return '%' + ((code_unit_value & 0xf000) >> 12 | 0xe0).toString(16).toUpperCase()
-			+ '%' + ((code_unit_value & 0xfc0) >> 6 | 0x80).toString(16).toUpperCase()
-			+ '%' + (code_unit_value & 0x3f | 0x80).toString(16).toUpperCase();
-	}
-
-	// 0xD800以降は未対応
-	throw new URIError();
-});
+    'refresh_token': REFRESH_TOKEN
+}
 
 export async function createSetlist(setlist: any) {
 
