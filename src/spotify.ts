@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
 import axios from 'axios'
 import SpotifyWebApi from 'spotify-web-api-node';
+import { decode } from 'punycode';
 
 interface Song {
     index: number;
@@ -46,7 +47,29 @@ const authData = {
     'refresh_token': 'AQDbn04HT4tNMovNt2r3j_xiNOz2qJPXrsIszfJEH7MfEQCR2ZBGsk9vrBeYosvqfy92UM2ciFLONzwd3K8J63wklBh9NBGfIypgOg-wgRpjGiYuPYD6gc933gNR_TpnhNU'
 };
 
-export async function createSetlist(setlist: Setlist) {
+var my_encodeURIComponent = (str: string) => str.replaceAll(/./g, (c) => {
+	if (/[A-Za-z0-9-_.!~*'()]/u.test(c)) {
+		return c;
+	}
+
+	var code_unit_value = c.charCodeAt(0);
+
+	if (code_unit_value <= 0x007F) {
+		return '%' + code_unit_value.toString(16).toUpperCase();
+	} else if (code_unit_value <= 0x07FF) {
+		return '%' + (((code_unit_value & 0x7c0) >> 6) | 0xc0).toString(16).toUpperCase()
+			+ '%' + ((code_unit_value & 0x3f) | 0x80).toString(16).toUpperCase();
+	} else if (code_unit_value <= 0xD7FF) {
+		return '%' + ((code_unit_value & 0xf000) >> 12 | 0xe0).toString(16).toUpperCase()
+			+ '%' + ((code_unit_value & 0xfc0) >> 6 | 0x80).toString(16).toUpperCase()
+			+ '%' + (code_unit_value & 0x3f | 0x80).toString(16).toUpperCase();
+	}
+
+	// 0xD800以降は未対応
+	throw new URIError();
+});
+
+export async function createSetlist(setlist: any) {
 
     try {
         const authUrl = 'https://accounts.spotify.com/api/token';
@@ -75,9 +98,13 @@ export async function createSetlist(setlist: Setlist) {
 }
 
 async function spSearchSong(name: string, artist: string): Promise<string> {
-    const q = `${encodeURIComponent(name)} ${encodeURIComponent(artist)}`;
-    const data = await spotifyApi.searchTracks(q, { limit: 2, offset: 0, market: 'US' }); // setlistfm と　livefansでマーケットは変更した方が良い
-    console.log(data.body.tracks!.items[0].artists); // 2番目の曲名を表示
+    const en_q = encodeURIComponent(`${name} ${artist}`);
+    const q = decodeURIComponent(en_q);
+    console.log(`Searching for: ${q}`);
+    const data = await spotifyApi.searchTracks(q, { limit: 10, offset: 0, market: 'JP' }); // setlistfm と　livefansでマーケットは変更した方が良い
+    // for (let i = 0; i < data.body.tracks!.items.length; i++) { // 検索結果をすべて表示  　
+    //     console.log(data.body.tracks!.items[i].name); 
+    // }
     return data.body.tracks!.items[0].id;
 }
 

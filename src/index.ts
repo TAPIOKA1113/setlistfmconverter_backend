@@ -4,7 +4,7 @@ import { serve } from '@hono/node-server'
 import axios from 'axios'
 import puppeteer from 'puppeteer'
 
-import { createSetlist } from './spotify' 
+import { createSetlist } from './spotify'
 
 
 const app = new Hono()
@@ -33,13 +33,13 @@ interface Setlist {
 }
 
 interface SortedElement {
-  artistName: string
+  original_artist: string
   position: number
-  content: string
+  name: string
 }
 
 
-async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> {
+async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> { // livefansでsetlist型のオブジェクトを作成
   const browser = await puppeteer.launch({ headless: false })
   const page = await browser.newPage()
 
@@ -54,8 +54,24 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
       return element.classList.contains('pcsl1')
     })
 
+    // アーティスト名取得
     const artistName = await page.$('h4 > a')
     const artistNameText = await artistName?.evaluate(element => element.textContent) || "";
+    // 開催日取得
+    const eventDate = await page.$('#content > div > div.dataBlock > div.profile > p.date')
+    const eventDateText = await eventDate?.evaluate(element => element.textContent) || "";
+    const event_date = new Date(eventDateText.replace(/(\d{4})\/(\d{2})\/(\d{2})\s+\(.*?\)\s+(\d{2}):(\d{2})\s+開演/, '$1-$2-$3T$4:$5:00.000Z'));
+    // 会場取得
+    const venueData = await page.$('#content > div > div.dataBlock > div.profile > address > a')
+    const venueText = await venueData?.evaluate(element => element.textContent) || "";
+    const venue = venueText.replace(/^＠/, '');
+    // 都市取得
+    const cityMatch = venue.match(/\((.*?)\)/);
+    const cityData = cityMatch ? cityMatch[1] : "";
+    // ツアー名取得
+    const tourData = await page.$('#content > div > div.dataBlock > div.head > h4.liveName2 > a')
+    const tourText = await tourData?.evaluate(element => element.textContent) || "";
+
 
     const results: SortedElement[] = []
 
@@ -75,7 +91,7 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
           if (aElement) {
             const textContent = await aElement.evaluate(element => element.textContent)
             if (textContent) {
-              results.push({ artistName: artistNameText, position: number, content: textContent.trim() })
+              results.push({ original_artist: artistNameText, position: number, name: textContent.trim() })
             }
           }
         } else {
@@ -89,14 +105,31 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
         if (aElement) {
           const textContent = await aElement.evaluate(element => element.textContent)
           if (textContent) {
-            results.push({ artistName: artistNameText, position: 0, content: textContent.trim() })
+            results.push({ original_artist: artistNameText, position: 0, name: textContent.trim() })
           }
         }
       }
     }
 
     // 1曲目から順に並び替え
-    return results.sort((a, b) => a.position - b.position)
+
+    const song = results.sort((a, b) => a.position - b.position)
+
+    const setlist: any = {
+      artist_name: artistNameText,
+      event_date: event_date,
+      location: cityData,
+      venue: venue,
+      tour_name: tourText,
+      songs: song,
+    }
+
+    const setlist_id = await createSetlist(setlist);
+    setlist['setlist_id'] = setlist_id;
+
+    return setlist;
+    // return results.sort((a, b) => a.position - b.position)
+
 
   } catch (error) {
 
@@ -118,13 +151,11 @@ app.get('/scrape/:id', async (c) => {  // LiveFansからセットリストを取
     return c.json({ error: 'URL parameter is required' }, 400)
   }
 
-  const sortedElements = await getVisuallySortedElements(url)
+  const setlist = await getVisuallySortedElements(url)
 
-
-
-  if (sortedElements) {
-    console.log(sortedElements)
-    return c.json(sortedElements)
+  if (setlist) {
+    console.log(setlist)
+    return c.json(setlist)
   } else {
     return c.json({ error: 'Failed to retrieve elements' }, 500)
   }
@@ -192,7 +223,9 @@ app.get('/api/setlist/:id', async (c) => {  // Setlist.fmからセットリス�
       tour_name: tourName,
       songs: setlistSongs,
     };
-    
+
+    console.log(setlist.event_date);
+
     const setlist_id = await createSetlist(setlist);
 
     setlist['setlist_id'] = setlist_id;
