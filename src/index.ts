@@ -40,7 +40,7 @@ interface SortedElement {
 
 
 async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> { // livefansでsetlist型のオブジェクトを作成
-  const browser = await puppeteer.launch({ headless: false })
+  const browser = await puppeteer.launch({ headless: true })
   const page = await browser.newPage()
 
   try {
@@ -143,7 +143,7 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
   }
 }
 
-app.get('/scrape/:id', async (c) => {  // LiveFansからセットリストを取得
+app.get('/api/livefans/:id', async (c) => {  // LiveFansからセットリストを取得
   const id = c.req.param('id')
   const url = `https://www.livefans.jp/events/${id}`
 
@@ -163,7 +163,7 @@ app.get('/scrape/:id', async (c) => {  // LiveFansからセットリストを取
 
 
 
-app.get('/api/setlist/:id', async (c) => {  // Setlist.fmからセットリストを取得
+app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリストを取得
   const id = c.req.param('id')
   const url = `https://api.setlist.fm/rest/1.0/setlist/${id}`
   const headers = {

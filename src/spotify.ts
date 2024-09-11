@@ -3,7 +3,6 @@ import { cors } from 'hono/cors'
 import { serve } from '@hono/node-server'
 import axios from 'axios'
 import SpotifyWebApi from 'spotify-web-api-node';
-import { decode } from 'punycode';
 import { USERNAME, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN } from '../env';
 
 interface Song {
