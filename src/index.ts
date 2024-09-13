@@ -165,6 +165,13 @@ app.get('/api/livefans/:id', async (c) => {  // LiveFansからセットリスト
 
 app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリストを取得
   const id = c.req.param('id')
+  // const iscover = c.req.query('isCover')
+  // const istape = c.req.query('isTape')
+
+  const iscover = c.req.query('isCover') === 'true'
+  const istape = c.req.query('isTape') === 'true'
+
+
   const url = `https://api.setlist.fm/rest/1.0/setlist/${id}`
   const headers = {
     "x-api-key": "rvH9s-nOQE4FOGgLByWj1VfmjzqIaEt5Q8wB",
@@ -174,7 +181,10 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
 
   try {
     const response = await axios.get(url, { headers })
+
+
     const data = response.data;
+
 
     const artistName = data.artist.name;
     const eventDate = new Date(data.eventDate.split('-').reverse().join('-'));
@@ -197,7 +207,7 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
         const medleyParts = songName.split(" / ");
         const isMedleyPart = medleyParts.length > 1;
 
-        medleyParts.forEach((medleyPart: string) => {
+        for (const medleyPart of medleyParts) {
           const originalArtist = isCover ? songData.cover.name : artistName;
           const song: Song = {
             index,
@@ -208,8 +218,17 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
             is_cover: isCover,
             is_medley_part: isMedleyPart
           };
-          setlistSongs.push(song);
-        });
+
+
+          if (song.is_tape) {
+            continue;
+          }
+
+          if (!iscover || !song.is_cover) {
+            setlistSongs.push(song);
+          }
+
+        };
       });
     });
 
@@ -223,8 +242,6 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
       tour_name: tourName,
       songs: setlistSongs,
     };
-
-    console.log(setlist.event_date);
 
     const setlist_id = await createSetlist(setlist);
 

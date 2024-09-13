@@ -1,29 +1,6 @@
-import { Hono } from 'hono'
-import { cors } from 'hono/cors'
-import { serve } from '@hono/node-server'
 import axios from 'axios'
 import SpotifyWebApi from 'spotify-web-api-node';
 import { USERNAME, CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN } from '../env';
-
-interface Song {
-    index: number;
-    name: string;
-    artist: string;
-    original_artist: string;
-    is_tape: boolean;
-    is_cover: boolean;
-    is_medley_part: boolean;
-}
-
-interface Setlist {
-    artist_name: string;
-    event_date: Date;
-    location: string;
-    venue: string;
-    tour_name: string;
-    songs: Song[];
-    setlist_id?: string;
-}
 
 
 const username = USERNAME;
