@@ -5,6 +5,7 @@ import axios from 'axios'
 import puppeteer from 'puppeteer'
 
 import { createSetlist } from './spotify'
+import { AnyCnameRecord } from 'dns'
 
 
 const app = new Hono()
@@ -36,6 +37,7 @@ interface SortedElement {
   original_artist: string
   position: number
   name: string
+  is_cover?: boolean;
 }
 
 
@@ -89,10 +91,16 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
           const number = parseInt(match[1], 10)
           const aElement = await td.$('div > a')
           if (aElement) {
-            const textContent = await aElement.evaluate(element => element.textContent)
-            if (textContent) {
-              results.push({ original_artist: artistNameText, position: number, name: textContent.trim() })
+            const textContent: any = await aElement.evaluate(element => element.textContent)
+            // カバー曲[]
+            const regex = /\[(.*?)\]/;
+            const match = textContent.match(regex);
+            if (match && match[1]) {
+              results.push({ original_artist: match[1], position: number, name: textContent.trim(), is_cover: true })
+            } else {
+              results.push({ original_artist: artistNameText, position: number, name: textContent.trim(), is_cover: false})
             }
+
           }
         } else {
           console.log(`No number found: ${topValue}`)
@@ -105,7 +113,7 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
         if (aElement) {
           const textContent = await aElement.evaluate(element => element.textContent)
           if (textContent) {
-            results.push({ original_artist: artistNameText, position: 0, name: textContent.trim() })
+            results.push({ original_artist: artistNameText, position: 0, name: textContent.trim(), })
           }
         }
       }
