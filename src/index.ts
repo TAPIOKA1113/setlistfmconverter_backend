@@ -114,6 +114,7 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
     // 1曲目から順に並び替え
 
     const song = results.sort((a, b) => a.position - b.position)
+    console.log(song)
 
     const setlist: any = {
       artist_name: artistNameText,
@@ -168,11 +169,11 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
   // const iscover = c.req.query('isCover')
   // const istape = c.req.query('isTape')
 
-  const iscover = c.req.query('isCover') === 'true'
-  const istape = c.req.query('isTape') === 'true'
+  const iscover: boolean = c.req.query('isCover') === 'true'  // 上のやり方だとstringが代入されるので上手くいかなかった(型を付けることの大切さ)
+  const istape: boolean = c.req.query('isTape') === 'true'
 
 
-  const url = `https://api.setlist.fm/rest/1.0/setlist/${id}`
+  const url: string = `https://api.setlist.fm/rest/1.0/setlist/${id}`
   const headers = {
     "x-api-key": "rvH9s-nOQE4FOGgLByWj1VfmjzqIaEt5Q8wB",
     "Accept": "application/json",
