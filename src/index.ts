@@ -14,13 +14,11 @@ const app = new Hono()
 app.use('*', cors())
 
 interface Song {
-  index: number;
   name: string;
-  artist: string;
   original_artist: string;
-  is_tape: boolean;
+  is_tape?: boolean;
   is_cover: boolean;
-  is_medley_part: boolean;
+  position?: number;  
 }
 
 interface Setlist {
@@ -33,15 +31,9 @@ interface Setlist {
   setlist_id?: string;
 }
 
-interface SortedElement {
-  original_artist: string
-  position: number
-  name: string
-  is_cover?: boolean;
-}
 
 
-async function getVisuallySortedElements(url: string): Promise<SortedElement[] | null> { // livefansでsetlist型のオブジェクトを作成
+async function getVisuallySortedElements(url: string): Promise<Song[] | null> { // livefansでsetlist型のオブジェクトを作成
   const browser = await puppeteer.launch({ headless: true })
   const page = await browser.newPage()
 
@@ -75,7 +67,8 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
     const tourText = await tourData?.evaluate(element => element.textContent) || "";
 
 
-    const results: SortedElement[] = []
+    const unsortSetlistSongs: Song[] = []
+
 
     if (isPCSL1) {
 
@@ -96,9 +89,9 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
             const regex = /\[(.*?)\]/;
             const match = textContent.match(regex);
             if (match && match[1]) {
-              results.push({ original_artist: match[1], position: number, name: textContent.trim(), is_cover: true })
+              unsortSetlistSongs.push({ original_artist: match[1], position: number, name: textContent.trim(), is_cover: true })
             } else {
-              results.push({ original_artist: artistNameText, position: number, name: textContent.trim(), is_cover: false})
+              unsortSetlistSongs.push({ original_artist: artistNameText, position: number, name: textContent.trim(), is_cover: false })
             }
 
           }
@@ -113,7 +106,7 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
         if (aElement) {
           const textContent = await aElement.evaluate(element => element.textContent)
           if (textContent) {
-            results.push({ original_artist: artistNameText, position: 0, name: textContent.trim(), })
+            unsortSetlistSongs.push({ original_artist: artistNameText, position: 0, name: textContent.trim(), is_cover: false })
           }
         }
       }
@@ -121,8 +114,15 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
 
     // 1曲目から順に並び替え
 
-    const song = results.sort((a, b) => a.position - b.position)
-    console.log(song)
+    const setlistSongs = unsortSetlistSongs.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+
+    // songからpositionを削除
+    setlistSongs.forEach((song) => {
+      delete song.position;
+    })
+
+    console.log(setlistSongs)
+
 
     const setlist: any = {
       artist_name: artistNameText,
@@ -130,14 +130,14 @@ async function getVisuallySortedElements(url: string): Promise<SortedElement[] |
       location: cityData,
       venue: venue,
       tour_name: tourText,
-      songs: song,
+      songs: setlistSongs,
     }
 
     const setlist_id = await createSetlist(setlist);
     setlist['setlist_id'] = setlist_id;
 
     return setlist;
-    // return results.sort((a, b) => a.position - b.position)
+    // return unsortSetlistSongs.sort((a, b) => a.position - b.position)
 
 
   } catch (error) {
@@ -205,11 +205,10 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
     const tourName = data.tour?.name || "";
 
     const setlistSongs: Song[] = [];
-    let index = 0;
 
     data.sets.set.forEach((setData: any) => {
       setData.song.forEach((songData: any) => {
-        index++;
+
         const songName = songData.name;
         const isTape = songData.tape || false;
         const isCover = 'cover' in songData;
@@ -219,13 +218,12 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
         for (const medleyPart of medleyParts) {
           const originalArtist = isCover ? songData.cover.name : artistName;
           const song: Song = {
-            index,
+
             name: medleyPart,
-            artist: artistName,
+
             original_artist: originalArtist,
             is_tape: isTape,
             is_cover: isCover,
-            is_medley_part: isMedleyPart
           };
 
 
