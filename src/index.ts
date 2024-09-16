@@ -18,7 +18,7 @@ interface Song {
   original_artist: string;
   is_tape?: boolean;
   is_cover: boolean;
-  position?: number;  
+  position?: number;
 }
 
 interface Setlist {
@@ -33,7 +33,7 @@ interface Setlist {
 
 
 
-async function getVisuallySortedElements(url: string): Promise<Song[] | null> { // livefansでsetlist型のオブジェクトを作成
+async function getVisuallySortedElements(url: string, iscover: boolean) { // livefansでsetlist型のオブジェクトを作成
   const browser = await puppeteer.launch({ headless: true })
   const page = await browser.newPage()
 
@@ -121,10 +121,20 @@ async function getVisuallySortedElements(url: string): Promise<Song[] | null> { 
       delete song.position;
     })
 
+    //iscoverがtrueの場合、is_coverがtrueの曲を削除
+    if (iscover) {
+      for (let i = 0; i < setlistSongs.length; i++) {
+        if (setlistSongs[i].is_cover) {
+          setlistSongs.splice(i, 1);
+          i--;
+        }
+      }
+    }
+
     console.log(setlistSongs)
 
 
-    const setlist: any = {
+    const setlist: Setlist = {
       artist_name: artistNameText,
       event_date: event_date,
       location: cityData,
@@ -154,13 +164,16 @@ async function getVisuallySortedElements(url: string): Promise<Song[] | null> { 
 
 app.get('/api/livefans/:id', async (c) => {  // LiveFansからセットリストを取得
   const id = c.req.param('id')
+
+  const iscover: boolean = c.req.query('isCover') === 'true'
+
   const url = `https://www.livefans.jp/events/${id}`
 
   if (!url) {
     return c.json({ error: 'URL parameter is required' }, 400)
   }
 
-  const setlist = await getVisuallySortedElements(url)
+  const setlist = await getVisuallySortedElements(url, iscover)
 
   if (setlist) {
     console.log(setlist)
@@ -213,14 +226,11 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
         const isTape = songData.tape || false;
         const isCover = 'cover' in songData;
         const medleyParts = songName.split(" / ");
-        const isMedleyPart = medleyParts.length > 1;
 
         for (const medleyPart of medleyParts) {
           const originalArtist = isCover ? songData.cover.name : artistName;
           const song: Song = {
-
             name: medleyPart,
-
             original_artist: originalArtist,
             is_tape: isTape,
             is_cover: isCover,
