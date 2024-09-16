@@ -67,3 +67,21 @@ async function spAddPlaylist(playlistId: string, trackId: string): Promise<void>
     await spotifyApi.addTracksToPlaylist(playlistId, [`spotify:track:${trackId}`]);
 }
 
+async function refreshToken() {
+    const authUrl = 'https://accounts.spotify.com/api/token';
+    const response = await axios.post(authUrl, authData, { headers: authHeaders });
+    accessToken = response.data.access_token;
+    spotifyApi.setAccessToken(accessToken);
+}
+
+export async function spGetPlaylist(playlistId: string) {
+
+    refreshToken();
+
+    const playlist = await spotifyApi.getPlaylist(playlistId);
+
+    return playlist
+}
+
+
+

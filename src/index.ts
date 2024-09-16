@@ -4,8 +4,7 @@ import { serve } from '@hono/node-server'
 import axios from 'axios'
 import puppeteer from 'puppeteer'
 
-import { createSetlist } from './spotify'
-import { AnyCnameRecord } from 'dns'
+import { createSetlist, spGetPlaylist } from './spotify'
 
 
 const app = new Hono()
@@ -69,7 +68,6 @@ async function getVisuallySortedElements(url: string, iscover: boolean) { // liv
 
     const unsortSetlistSongs: Song[] = []
 
-
     if (isPCSL1) {
 
       for (const td of tdElements) {
@@ -113,7 +111,6 @@ async function getVisuallySortedElements(url: string, iscover: boolean) { // liv
     }
 
     // 1曲目から順に並び替え
-
     const setlistSongs = unsortSetlistSongs.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
 
     // songからpositionを削除
@@ -271,6 +268,13 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
     return c.json({ error: 'Failed to fetch setlist' }, 500)
   }
 })
+
+app.get('/api/modify/:id', async (c) => {  
+  const id = c.req.param('id')
+
+  const response = await spGetPlaylist(id);
+  return c.json(response);
+});
 
 
 const port = 3000
