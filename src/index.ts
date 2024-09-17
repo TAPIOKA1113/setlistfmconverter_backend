@@ -4,7 +4,7 @@ import { serve } from '@hono/node-server'
 import axios from 'axios'
 import puppeteer from 'puppeteer'
 
-import { createSetlist, spGetPlaylist } from './spotify'
+import { createSetlist, spGetPlaylist, spModSearchSong } from './spotify'
 
 
 const app = new Hono()
@@ -269,12 +269,23 @@ app.get('/api/setlistfm/:id', async (c) => {  // Setlist.fmからセットリス
   }
 })
 
-app.get('/api/modify/:id', async (c) => {  
+app.get('/api/modify/:id', async (c) => {
   const id = c.req.param('id')
 
   const response = await spGetPlaylist(id);
   return c.json(response);
 });
+
+// 曲名とアーティスト名からSpotifyを検索
+app.get('/api/song/search/:artist/:name', async (c) => {
+  const name: string = c.req.param('name') || ''
+  const artist: string = c.req.param('artist') || ''
+
+  const data = await spModSearchSong(name, artist);
+
+  return c.json(data);
+})
+
 
 
 const port = 3000

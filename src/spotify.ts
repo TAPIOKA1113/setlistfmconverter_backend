@@ -24,6 +24,14 @@ const authData = {
     'refresh_token': REFRESH_TOKEN
 }
 
+async function refreshToken() {
+    const authUrl = 'https://accounts.spotify.com/api/token';
+    const response = await axios.post(authUrl, authData, { headers: authHeaders });
+    accessToken = response.data.access_token;
+    spotifyApi.setAccessToken(accessToken);
+}
+
+
 export async function createSetlist(setlist: any) {
 
     try {
@@ -61,18 +69,13 @@ async function spSearchSong(name: string, artist: string): Promise<string> {
     //     console.log(data.body.tracks!.items[i].name); 
     // }
     return data.body.tracks!.items[0].id;
+
 }
 
 async function spAddPlaylist(playlistId: string, trackId: string): Promise<void> {
     await spotifyApi.addTracksToPlaylist(playlistId, [`spotify:track:${trackId}`]);
 }
 
-async function refreshToken() {
-    const authUrl = 'https://accounts.spotify.com/api/token';
-    const response = await axios.post(authUrl, authData, { headers: authHeaders });
-    accessToken = response.data.access_token;
-    spotifyApi.setAccessToken(accessToken);
-}
 
 export async function spGetPlaylist(playlistId: string) {
 
@@ -83,5 +86,15 @@ export async function spGetPlaylist(playlistId: string) {
     return playlist
 }
 
+export async function spModSearchSong(name: string, artist: string): Promise<string> {
+    refreshToken();
+    const en_q = encodeURIComponent(`${name} ${artist}`);
+    const q = decodeURIComponent(en_q);
+    console.log(`Searching for: ${q}`);
+    const data = await spotifyApi.searchTracks(q, { limit: 10, offset: 0, market: 'JP' }); // setlistfm と　livefansでマーケットは変更した方が良い
+    // for (let i = 0; i < data.body.tracks!.items.length; i++) { // 検索結果をすべて表示  　
+    //     console.log(data.body.tracks!.items[i].name); 
+    // }
+    return data.body
 
-
+}
