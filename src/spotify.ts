@@ -98,3 +98,14 @@ export async function spModSearchSong(name: string, artist: string): Promise<str
     return data.body
 
 }
+
+export async function spReCreatePlaylist(id: string) {
+    refreshToken();
+    // idのプレイリストからプレイリストの名前だけを取得
+    const playlist = await spotifyApi.getPlaylist(id);
+    const name = playlist.body.name;
+    
+    
+    return name
+}
+

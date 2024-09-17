@@ -4,7 +4,7 @@ import { serve } from '@hono/node-server'
 import axios from 'axios'
 import puppeteer from 'puppeteer'
 
-import { createSetlist, spGetPlaylist, spModSearchSong } from './spotify'
+import { createSetlist, spGetPlaylist, spModSearchSong, spReCreatePlaylist } from './spotify'
 
 
 const app = new Hono()
@@ -286,6 +286,15 @@ app.get('/api/song/search/:artist/:name', async (c) => {
   return c.json(data);
 })
 
+app.post('/api/recreate/playlist/:id', async (c) => {
+  const id: string = c.req.param('id')
+  const songIds: string[] = JSON.parse(await c.req.text());
+  console.log(songIds);  
+
+  const response = await spReCreatePlaylist(id) as any;
+
+  return c.json(response);
+})
 
 
 const port = 3000
